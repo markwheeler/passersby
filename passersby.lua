@@ -3,18 +3,18 @@
 -- MIDI controlled West Coast
 -- style mono synth.
 --
--- ENC1/KEY2 : Change page
--- KEY3 : Change tab
--- ENC2/3 : Adjust parameters
+-- E1/K2 : Change page
+-- K3 : Change tab
+-- E2/3 : Adjust parameters
 --
--- v1.1.0 Mark Eats
+-- v1.1.1 Mark Eats
 --
 
-local MusicUtil = require "mark_eats/musicutil"
-local UI = require "mark_eats/ui"
-local Graph = require "mark_eats/graph"
-local EnvGraph = require "mark_eats/envgraph"
-local Passersby = require "mark_eats/passersby"
+local MusicUtil = require "musicutil"
+local UI = require "ui"
+local Graph = require "graph"
+local EnvGraph = require "envgraph"
+local Passersby = require "passersby"
 
 local SCREEN_FRAMERATE = 15
 local screen_refresh_metro
@@ -525,8 +525,6 @@ end
 -- MIDI input
 local function midi_event(data)
   
-  if #data == 0 then return end
-  
   local msg = midi.to_msg(data)
   local channel_param = params:get("midi_channel")
   
@@ -566,7 +564,7 @@ function init()
   -- Add params
   
   params:add{type = "number", id = "midi_device", name = "MIDI Device", min = 1, max = 4, default = 1, action = function(value)
-    midi_in_device:reconnect(value)
+    midi_in_device = midi.connect(value)
   end}
   
   local channels = {"All"}
@@ -752,8 +750,8 @@ function init()
   
   env_status.text = ""
   env_status.x, env_status.y = 0, 0
-  env_status_metro = metro.alloc()
-  env_status_metro.callback = function()
+  env_status_metro = metro.init()
+  env_status_metro.event = function()
     env_status.text = ""
     screen_dirty = true
   end
@@ -829,8 +827,8 @@ function init()
   reverb_mix_poll:start()
   
   -- Start drawing to screen
-  screen_refresh_metro = metro.alloc()
-  screen_refresh_metro.callback = function()
+  screen_refresh_metro = metro.init()
+  screen_refresh_metro.event = function()
     update()
     if screen_dirty then
       screen_dirty = false
