@@ -14,7 +14,7 @@ local MusicUtil = require "musicutil"
 local UI = require "ui"
 local Graph = require "graph"
 local EnvGraph = require "envgraph"
-local Passersby = require "passersby"
+local Passersby = require "passersby/lib/passersby_engine"
 
 local SCREEN_FRAMERATE = 15
 local screen_refresh_metro
