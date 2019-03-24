@@ -1,21 +1,17 @@
 // CroneEngine_Passersby
 // West coast style mono synth with complex waveform generation, basic FM and a lowpass gate.
-// v1.1.0 Mark Eats
+// v1.1.1 Mark Eats
 
 Engine_Passersby : CroneEngine {
 
 	var lfos;
-	var oscMods;
-	var additiveGroup;
 	var synthVoice;
 	var reverb;
 
 	var lfosBus;
-	var freqBus;
-	var modFreqBus;
-	var phaseBus;
-	var additiveOscBus;
 	var fxBus;
+
+	var replyFunc;
 
 	var numLfoDests = 9;
 	var lfoDests;
@@ -36,10 +32,6 @@ Engine_Passersby : CroneEngine {
 		Routine({
 
 			lfosBus = Bus.control(server: context.server, numChannels: numLfoDests);
-			freqBus = Bus.control(server: context.server, numChannels: 1);
-			modFreqBus = Bus.audio(server: context.server, numChannels: 1);
-			phaseBus = Bus.audio(server: context.server, numChannels: 1);
-			additiveOscBus = Bus.audio(server: context.server, numChannels: 1);
 			fxBus = Bus.audio(server: context.server, numChannels: 1);
 
 			noteList = List.new();
@@ -72,24 +64,30 @@ Engine_Passersby : CroneEngine {
 				outArray[7] = ((lfo * lfoToDecayAmount) + LFNoise1.kr(freq: i_driftRate, mul: drift)) * 2.2; // Decay
 				outArray[8] = (lfo * lfoToReverbMixAmount) + LFNoise1.kr(freq: i_driftRate, mul: drift); // Reverb Mix
 
-				SendTrig.kr(in: Impulse.kr(15), id: i_outIds, value: outArray);
+				SendReply.kr(trig: Impulse.kr(15), cmdName: '/replyLfos', values: outArray);
 				Out.kr(out, outArray);
 
 			}).add;
 
+			// Synth voice
+			SynthDef(\synthVoice, {
 
-			// Osc mods
-			SynthDef(\oscMods, {
+				arg out, lfosIn, t_gate, gate, killGate, freq = 220, pitchBendRatio = 1, glide = 0, fm1Ratio = 0.66, fm2Ratio = 3.3, fm1Amount = 0.0, fm2Amount = 0.0,
+				vel = 0.7, pressure = 0, timbre = 0, waveShape = 0, waveFolds = 0, envType = 0, attack = 0.04, peak = 10000, decay = 1, amp = 1;
 
-				arg freqOut, modFreqOut, phaseOut, lfosIn, freq = 220, pitchBendRatio = 1, glide = 0,
-				fm1Ratio = 0.66, fm2Ratio = 3.3, fm1Amount = 0.0, fm2Amount = 0.0;
-
-				var i_nyquist = SampleRate.ir * 0.5, modFreq, mod1, mod2, mod1Index, mod2Index, mod1Freq, mod2Freq, controlLag = 0.005;
+				var i_nyquist = SampleRate.ir * 0.5, signal, controlLag = 0.005, i_numHarmonics = 48,
+				modFreq, mod1, mod2, mod1Index, mod2Index, mod1Freq, mod2Freq, sinOsc, triOsc, additiveOsc, additivePhase,
+				filterEnvVel, filterEnvLow, lpgEnvelope, lpgSignal, asrEnvelope, asrFilterFreq, asrSignal, killEnvelope;
 
 				// LFO ins
 				freq = (freq * In.kr(lfosIn, numLfoDests)[0]).clip(0, i_nyquist);
+				waveShape = (waveShape + In.kr(lfosIn, numLfoDests)[1]).clip(0, 1);
+				waveFolds = (waveFolds + In.kr(lfosIn, numLfoDests)[2]).clip(0, 3);
 				fm1Amount = (fm1Amount + In.kr(lfosIn, numLfoDests)[3]).clip(0, 1);
 				fm2Amount = (fm2Amount + In.kr(lfosIn, numLfoDests)[4]).clip(0, 1);
+				attack = (attack + In.kr(lfosIn, numLfoDests)[5]).clip(0.003, 8);
+				peak = (peak * In.kr(lfosIn, numLfoDests)[6]).clip(100, 10000);
+				decay = (decay + In.kr(lfosIn, numLfoDests)[7]).clip(0.01, 8);
 
 				// Lag inputs
 				freq = Lag.kr(freq * pitchBendRatio, 0.007 + glide);
@@ -97,6 +95,13 @@ Engine_Passersby : CroneEngine {
 				fm2Ratio = Lag.kr(fm2Ratio, controlLag);
 				fm1Amount = Lag.kr(fm1Amount.squared, controlLag);
 				fm2Amount = Lag.kr(fm2Amount.squared, controlLag);
+
+				vel = Lag.kr(vel, controlLag);
+				waveShape = Lag.kr(waveShape, controlLag);
+				waveFolds = Lag.kr(waveFolds, controlLag);
+				attack = Lag.kr(attack, controlLag);
+				peak = Lag.kr(peak, controlLag);
+				decay = Lag.kr(decay, controlLag);
 
 				// Modulators
 				mod1Index = fm1Amount * 22;
@@ -107,66 +112,29 @@ Engine_Passersby : CroneEngine {
 				mod2 = SinOsc.ar(freq: mod2Freq, phase: 0, mul: mod2Index * mod2Freq, add: 0);
 				modFreq = freq + mod1 + mod2;
 
-				Out.kr(freqOut, freq);
-				Out.ar(modFreqOut, modFreq);
-				Out.ar(phaseOut, LFSaw.ar(freq: modFreq, iphase: 1, mul: pi, add: pi));
-			}).add;
+				// Sine and triangle
+				sinOsc = SinOsc.ar(freq: modFreq, phase: 0, mul: 0.5);
+				triOsc = VarSaw.ar(freq: modFreq, iphase: 0, width: 0.5, mul: 0.5);
 
-
-			// Additive osc for square and saw
-			SynthDef(\additiveOsc, {
-				arg out, freqIn, phaseIn, offset = 0, waveShape;
-				var i_nyquist = SampleRate.ir * 0.5, i_numHarmonics = 12, signal;
-
-				waveShape = waveShape.linlin(0.666666, 1, 0, 1);
-
-				signal = Mix.fill(i_numHarmonics, {
+				// Additive square and saw
+				additivePhase = LFSaw.ar(freq: modFreq, iphase: 1, mul: pi, add: pi);
+				additiveOsc = Mix.fill(i_numHarmonics, {
 					arg index;
 					var harmonic, harmonicFreq, harmonicCutoff, attenuation;
 
-					harmonic = index + 1 + (i_numHarmonics * offset);
-					harmonicFreq = In.kr(freqIn, 1) * harmonic;
+					harmonic = index + 1;
+					harmonicFreq = freq * harmonic;
 					harmonicCutoff = i_nyquist - harmonicFreq;
 
 					// Attenuate harmonics that will go over nyquist once FM is applied
 					attenuation = Select.kr(index, [1, // Save the fundamental
 						(harmonicCutoff - (harmonicFreq * 0.25) - harmonicFreq).expexp(0.000001, harmonicFreq * 0.5, 0.000001, 1)]);
 
-					(sin(In.ar(phaseIn, 1) * harmonic % 2pi) / harmonic) * attenuation * (harmonic % 2 + waveShape).min(1);
+					(sin(additivePhase * harmonic % 2pi) / harmonic) * attenuation * (harmonic % 2 + waveShape.linlin(0.666666, 1, 0, 1)).min(1);
 				});
 
-				Out.ar(out, signal * 0.25);
-			}).add;
-
-
-			// Synth voice
-			SynthDef(\synthVoice, {
-
-				arg out, lfosIn, modFreqIn, additiveOscIn, t_gate, gate, killGate, vel = 0.7, pressure = 0, timbre = 0,
-				waveShape = 0, waveFolds = 0, envType = 0, attack = 0.04, peak = 10000, decay = 1, amp = 1;
-
-				var i_nyquist = SampleRate.ir * 0.5, signal, controlLag = 0.005,
-				sinOsc, triOsc, filterEnvVel, filterEnvLow, lpgEnvelope, lpgSignal, asrEnvelope, asrFilterFreq, asrSignal, killEnvelope;
-
-				// LFO ins
-				waveShape = (waveShape + In.kr(lfosIn, numLfoDests)[1]).clip(0, 1);
-				waveFolds = (waveFolds + In.kr(lfosIn, numLfoDests)[2]).clip(0, 3);
-				attack = (attack + In.kr(lfosIn, numLfoDests)[5]).clip(0.003, 8);
-				peak = (peak * In.kr(lfosIn, numLfoDests)[6]).clip(100, 10000);
-				decay = (decay + In.kr(lfosIn, numLfoDests)[7]).clip(0.01, 8);
-
-				// Lag inputs
-				vel = Lag.kr(vel, controlLag);
-				waveShape = Lag.kr(waveShape, controlLag);
-				waveFolds = Lag.kr(waveFolds, controlLag);
-				attack = Lag.kr(attack, controlLag);
-				peak = Lag.kr(peak, controlLag);
-				decay = Lag.kr(decay, controlLag);
-
-				// Carrier waves
-				sinOsc = SinOsc.ar(freq: In.ar(modFreqIn, 1), phase: 0, mul: 0.5);
-				triOsc = VarSaw.ar(freq: In.ar(modFreqIn, 1), iphase: 0, width: 0.5, mul: 0.5);
-				signal = LinSelectX.ar(waveShape * 3, [sinOsc, triOsc, In.ar(additiveOscIn, 1)]);
+				// Mix carriers
+				signal = LinSelectX.ar(waveShape * 3, [sinOsc, triOsc, additiveOsc]);
 
 				// Fold
 				signal = Fold.ar(in: signal * (1 + (timbre * 0.5) + (waveFolds * 2)), lo: -0.5, hi: 0.5);
@@ -232,24 +200,9 @@ Engine_Passersby : CroneEngine {
 
 			lfos = Synth(defName: \lfos, args: [\out, lfosBus], target: context.xg);
 
-			oscMods = Synth.newPaused(defName: \oscMods, args: [
-				\freqOut, freqBus,
-				\modFreqOut, modFreqBus,
-				\phaseOut, phaseBus,
-				\lfosIn, lfosBus
-			], target: context.xg, addAction: \addToTail);
-
-			additiveGroup = ParGroup.new(context.xg, \addToTail);
-			4.do({
-				arg index;
-				Synth.newPaused(defName: \additiveOsc, args: [\out, additiveOscBus, \freqIn, freqBus, \phaseIn, phaseBus, \offset, index], target: additiveGroup);
-			});
-
 			synthVoice = Synth.newPaused(defName: \synthVoice, args: [
 				\out, fxBus,
 				\lfosIn, lfosBus,
-				\modFreqIn, modFreqBus,
-				\additiveOscIn, additiveOscBus
 			], target: context.xg, addAction: \addToTail);
 
 			reverb = Synth(defName: \reverb, args: [
@@ -262,21 +215,17 @@ Engine_Passersby : CroneEngine {
 
 
 		// Receive messages from server
-		OSCFunc({
+		replyFunc = OSCFunc({
 			arg msg;
-			var index = msg[2];
-			var value = msg[3];
-			switch(index,
-				1, { waveShapeModPoll.update(value) },
-				2, { waveFoldsModPoll.update(value) },
-				3, { fm1AmountModPoll.update(value) },
-				4, { fm2AmountModPoll.update(value) },
-				5, { attackModPoll.update(value) },
-				6, { peakMulModPoll.update(value) },
-				7, { decayModPoll.update(value) },
-				8, { reverbMixModPoll.update(value) }
-			);
-		}, path: '/tr', srcID: context.server.addr);
+			waveShapeModPoll.update(msg[4]);
+			waveFoldsModPoll.update(msg[5]);
+			fm1AmountModPoll.update(msg[6]);
+			fm2AmountModPoll.update(msg[7]);
+			attackModPoll.update(msg[8]);
+			peakMulModPoll.update(msg[9]);
+			decayModPoll.update(msg[10]);
+			reverbMixModPoll.update(msg[11]);
+		}, path: '/replyLfos', srcID: context.server.addr);
 
 		// Polls
 		waveShapeModPoll = this.addPoll(name: "waveShapeMod", periodic: false);
@@ -288,8 +237,11 @@ Engine_Passersby : CroneEngine {
 		decayModPoll = this.addPoll(name: "decayMod", periodic: false);
 		reverbMixModPoll = this.addPoll(name: "reverbMixMod", periodic: false);
 
+		this.addCommands;
+	}
 
-		// Commands
+
+	addCommands {
 
 		// noteOn(id, freq, vel)
 		this.addCommand(\noteOn, "iff", { arg msg;
@@ -298,14 +250,11 @@ Engine_Passersby : CroneEngine {
 
 			noteList.remove(noteList.detect{arg item; item[\id] == id});
 
-			if(oscMods.notNil && additiveGroup.notNil && synthVoice.notNil, {
+			if(synthVoice.notNil, {
 				pauseRoutine.stop;
-				oscMods.run(true);
-				additiveGroup.run(true);
 				synthVoice.run(true);
+				synthVoice.set(\freq, freq, \vel, vel, \t_gate, 1, \gate, 1, \killGate, 1);
 
-				oscMods.set(\freq, freq);
-				synthVoice.set(\vel, vel, \t_gate, 1, \gate, 1, \killGate, 1);
 				note[\id] = id;
 				note[\freq] = freq;
 				noteList.add(note);
@@ -316,9 +265,7 @@ Engine_Passersby : CroneEngine {
 		startPauseRoutine = {
 			pauseRoutine = Routine {
 				(decay + 0.01).wait;
-				if(oscMods.notNil && additiveGroup.notNil && synthVoice.notNil, {
-					oscMods.run(false);
-					additiveGroup.run(false);
+				if(synthVoice.notNil, {
 					synthVoice.run(false);
 				});
 			}.play;
@@ -333,7 +280,7 @@ Engine_Passersby : CroneEngine {
 
 			if(id == activeNoteId, {
 				if(noteList.size > 0, {
-					oscMods.set(\freq, noteList.last.[\freq]);
+					synthVoice.set(\freq, noteList.last.[\freq]);
 					activeNoteId = noteList.last.[\id];
 				}, {
 					synthVoice.set(\gate, 0);
@@ -362,7 +309,7 @@ Engine_Passersby : CroneEngine {
 
 			if(id == activeNoteId, {
 				if(noteList.size > 0, {
-					oscMods.set(\freq, noteList.last.[\freq]);
+					synthVoice.set(\freq, noteList.last.[\freq]);
 					activeNoteId = noteList.last.[\id];
 				}, {
 					synthVoice.set(\gate, 0);
@@ -386,12 +333,12 @@ Engine_Passersby : CroneEngine {
 
 		// pitchBend(id, ratio)
 		this.addCommand(\pitchBend, "if", { arg msg;
-			oscMods.set(\pitchBendRatio, msg[2]);
+			synthVoice.set(\pitchBendRatio, msg[2]);
 		});
 
 		// pitchBendAll(ratio)
 		this.addCommand(\pitchBendAll, "f", { arg msg;
-			oscMods.set(\pitchBendRatio, msg[1]);
+			synthVoice.set(\pitchBendRatio, msg[1]);
 		});
 
 		// pressure(id, pressure)
@@ -415,12 +362,11 @@ Engine_Passersby : CroneEngine {
 		});
 
 		this.addCommand(\glide, "f", { arg msg;
-			oscMods.set(\glide, msg[1]);
+			synthVoice.set(\glide, msg[1]);
 		});
 
 		this.addCommand("waveShape", "f", { arg msg;
 			var waveShape = msg[1];
-			additiveGroup.set(\waveShape, waveShape);
 			synthVoice.set(\waveShape, waveShape);
 		});
 
@@ -429,19 +375,19 @@ Engine_Passersby : CroneEngine {
 		});
 
 		this.addCommand("fm1Ratio", "f", { arg msg;
-			oscMods.set(\fm1Ratio, msg[1]);
+			synthVoice.set(\fm1Ratio, msg[1]);
 		});
 
 		this.addCommand("fm2Ratio", "f", { arg msg;
-			oscMods.set(\fm2Ratio, msg[1]);
+			synthVoice.set(\fm2Ratio, msg[1]);
 		});
 
 		this.addCommand("fm1Amount", "f", { arg msg;
-			oscMods.set(\fm1Amount, msg[1]);
+			synthVoice.set(\fm1Amount, msg[1]);
 		});
 
 		this.addCommand("fm2Amount", "f", { arg msg;
-			oscMods.set(\fm2Amount, msg[1]);
+			synthVoice.set(\fm2Amount, msg[1]);
 		});
 
 		this.addCommand("envType", "i", { arg msg;
@@ -457,8 +403,7 @@ Engine_Passersby : CroneEngine {
 		});
 
 		this.addCommand("decay", "f", { arg msg;
-			decay = msg[1];
-			synthVoice.set(\decay, decay);
+			synthVoice.set(\decay, msg[1]);
 		});
 
 		this.addCommand("amp", "f", { arg msg;
@@ -519,11 +464,11 @@ Engine_Passersby : CroneEngine {
 
 	}
 
+
 	free {
 		lfos.free;
-		oscMods.free;
-		additiveGroup.free;
 		synthVoice.free;
 		reverb.free;
+		replyFunc.free;
 	}
 }
