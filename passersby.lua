@@ -564,7 +564,9 @@ function init()
   -- Add params
   
   params:add{type = "number", id = "midi_device", name = "MIDI Device", min = 1, max = 4, default = 1, action = function(value)
+    midi_in_device.event = nil
     midi_in_device = midi.connect(value)
+    midi_in_device.event = midi_event
   end}
   
   local channels = {"All"}
