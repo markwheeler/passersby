@@ -75,7 +75,7 @@ Engine_Passersby : CroneEngine {
 				arg out, lfosIn, t_gate, gate, killGate, freq = 220, pitchBendRatio = 1, glide = 0, fm1Ratio = 0.66, fm2Ratio = 3.3, fm1Amount = 0.0, fm2Amount = 0.0,
 				vel = 0.7, pressure = 0, timbre = 0, waveShape = 0, waveFolds = 0, envType = 0, attack = 0.04, peak = 10000, decay = 1, amp = 1;
 
-				var i_nyquist = SampleRate.ir * 0.5, signal, controlLag = 0.005, i_numHarmonics = 48,
+				var i_nyquist = SampleRate.ir * 0.5, signal, controlLag = 0.005, i_numHarmonics = 44,
 				modFreq, mod1, mod2, mod1Index, mod2Index, mod1Freq, mod2Freq, sinOsc, triOsc, additiveOsc, additivePhase,
 				filterEnvVel, filterEnvLow, lpgEnvelope, lpgSignal, asrEnvelope, asrFilterFreq, asrSignal, killEnvelope;
 
@@ -146,7 +146,7 @@ Engine_Passersby : CroneEngine {
 				signal = signal + PinkNoise.ar(mul: 0.003);
 
 				// LPG
-				filterEnvVel = vel.linexp(0, 1, 0.5, 1);
+				filterEnvVel = vel.linlin(0, 1, 0.5, 1);
 				filterEnvLow = (peak * filterEnvVel).min(300);
 
 				lpgEnvelope = EnvGen.ar(envelope: Env.new(levels: [0, 1, 0], times: [0.003, decay], curve: [4, -20]), gate: t_gate);
