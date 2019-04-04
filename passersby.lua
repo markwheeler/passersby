@@ -1,4 +1,6 @@
 -- Passersby
+-- 1.1.1 @markeats
+-- llllllll.co/t/21089
 --
 -- MIDI controlled West Coast
 -- style mono synth.
@@ -6,8 +8,6 @@
 -- E1/K2 : Change page
 -- K3 : Change tab
 -- E2/3 : Adjust parameters
---
--- v1.1.1 Mark Eats
 --
 
 local MusicUtil = require "musicutil"
