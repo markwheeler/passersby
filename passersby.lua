@@ -1,6 +1,6 @@
 -- Passersby
 -- 1.1.1 @markeats
--- llllllll.co/t/21089
+-- llllllll.co/t/passersby
 --
 -- MIDI controlled West Coast
 -- style mono synth.
