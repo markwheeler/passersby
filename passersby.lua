@@ -21,7 +21,7 @@ local screen_refresh_metro
 local screen_dirty = true
 
 local midi_in_device
-local g
+local grid_device
 
 local active_notes = {}
 
@@ -525,14 +525,11 @@ function key(n, z)
 end
 
 -- Grid input
-
-local function grid_event(x, y, z)
-  local note = ((7-y)*5) + x
-  local hz = 55*2^(note/12)
-  local note_num = MusicUtil.freq_to_note_num(hz)
+local function grid_key(x, y, z)
+  local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127) 
 
   if z == 1 then
-    note_on(note_num, 100)
+    note_on(note_num, 0.8)
     g:led(x, y,15)
   else
     g:led(x, y,0)
@@ -580,8 +577,8 @@ function init()
   midi_in_device = midi.connect(1)
   midi_in_device.event = midi_event
 
-  g = grid.connect()
-  g.key = grid_event
+  grid_device = grid.connect()
+  grid_device.key = grid_key
 
   -- Add params
   
