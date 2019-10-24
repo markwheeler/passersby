@@ -21,6 +21,8 @@ local screen_refresh_metro
 local screen_dirty = true
 
 local midi_in_device
+local grid_device
+
 local active_notes = {}
 
 local pages
@@ -522,6 +524,20 @@ function key(n, z)
   end
 end
 
+-- Grid input
+local function grid_key(x, y, z)
+  local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127) 
+
+  if z == 1 then
+    note_on(note_num, 0.8)
+    g:led(x, y,15)
+  else
+    g:led(x, y,0)
+    note_off(note_num)
+  end
+  g:refresh()
+end
+
 -- MIDI input
 local function midi_event(data)
   
@@ -560,7 +576,10 @@ function init()
   
   midi_in_device = midi.connect(1)
   midi_in_device.event = midi_event
-  
+
+  grid_device = grid.connect()
+  grid_device.key = grid_key
+
   -- Add params
   
   params:add{type = "number", id = "midi_device", name = "MIDI Device", min = 1, max = 4, default = 1, action = function(value)
