@@ -2,7 +2,7 @@
 -- Engine params and functions.
 --
 -- @module PassersbyEngine
--- @release v1.1.1
+-- @release v1.2.0
 -- @author Mark Eats
 
 local ControlSpec = require "controlspec"
@@ -60,6 +60,7 @@ end
 
 function Passersby.add_params()
   
+  params:add_separator("Oscillators")
   params:add{type = "control", id = "glide", name = "Glide", controlspec = specs.GLIDE, action = engine.glide}
   params:add{type = "control", id = "wave_shape", name = "Wave Shape", controlspec = specs.WAVE_SHAPE, formatter = format_wave_shape, action = engine.waveShape}
   params:add{type = "control", id = "wave_folds", name = "Wave Folds", controlspec = specs.WAVE_FOLDS, action = engine.waveFolds}
@@ -67,6 +68,8 @@ function Passersby.add_params()
   params:add{type = "control", id = "fm_high_ratio", name = "FM High Ratio", controlspec = specs.FM_HIGH_RATIO, action = engine.fm2Ratio}
   params:add{type = "control", id = "fm_low_amount", name = "FM Low Amount", controlspec = specs.FM_LOW_AMOUNT, action = engine.fm1Amount}
   params:add{type = "control", id = "fm_high_amount", name = "FM High Amount", controlspec = specs.FM_HIGH_AMOUNT, action = engine.fm2Amount}
+
+  params:add_separator("LPG")
   params:add{type = "option", id = "env_type", name = "Envelope Type", options = {"LPG", "Sustain"}, action = function(value)
     engine.envType(value - 1)
   end}
@@ -74,7 +77,11 @@ function Passersby.add_params()
   params:add{type = "control", id = "peak", name = "Peak", controlspec = specs.PEAK, formatter = Formatters.format_freq, action = engine.peak}
   params:add{type = "control", id = "decay", name = "Decay", controlspec = specs.DECAY, formatter = Formatters.format_secs, action = engine.decay}
   params:add{type = "control", id = "amp", name = "Amp", controlspec = specs.AMP, action = engine.amp}
+
+  params:add_separator("Reverb")
   params:add{type = "control", id = "reverb_mix", name = "Reverb Mix", controlspec = specs.REVERB_MIX, action = engine.reverbMix}
+
+  params:add_separator("LFO")
   params:add{type = "option", id = "lfo_shape", name = "LFO Shape", options = {"Triangle", "Ramp", "Square", "Random"}, action = function(value)
     engine.lfoShape(value - 1)
   end}
@@ -88,6 +95,8 @@ function Passersby.add_params()
   params:add{type = "control", id = "lfo_to_peak_amount", name = "LFO > Peak", controlspec = specs.LFO_AMOUNT, action = engine.lfoToPeakAmount}
   params:add{type = "control", id = "lfo_to_decay_amount", name = "LFO > Decay", controlspec = specs.LFO_AMOUNT, action = engine.lfoToDecayAmount}
   params:add{type = "control", id = "lfo_to_reverb_mix_amount", name = "LFO > Reverb Mix", controlspec = specs.LFO_AMOUNT, action = engine.lfoToReverbMixAmount}
+
+  params:add_separator("Fate")
   params:add{type = "control", id = "drift", name = "Drift", controlspec = specs.DRIFT, action = engine.drift}
   
   params:bang()

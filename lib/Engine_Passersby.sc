@@ -1,6 +1,6 @@
 // CroneEngine_Passersby
 // West coast style mono synth with complex waveform generation, basic FM and a lowpass gate.
-// v1.1.1 Mark Eats
+// v1.2.0 Mark Eats
 
 Engine_Passersby : CroneEngine {
 
@@ -21,7 +21,7 @@ Engine_Passersby : CroneEngine {
 
 	var startPauseRoutine;
 	var pauseRoutine;
-	var decay = 1;
+	var maxDecay = 8;
 
 	*new { arg context, doneCallback;
 		^super.new(context, doneCallback);
@@ -87,7 +87,7 @@ Engine_Passersby : CroneEngine {
 				fm2Amount = (fm2Amount + In.kr(lfosIn, numLfoDests)[4]).clip(0, 1);
 				attack = (attack + In.kr(lfosIn, numLfoDests)[5]).clip(0.003, 8);
 				peak = (peak * In.kr(lfosIn, numLfoDests)[6]).clip(100, 10000);
-				decay = (decay + In.kr(lfosIn, numLfoDests)[7]).clip(0.01, 8);
+				decay = (decay + In.kr(lfosIn, numLfoDests)[7]).clip(0.01, maxDecay);
 
 				// Lag inputs
 				freq = Lag.kr(freq * pitchBendRatio, 0.007 + glide);
@@ -264,7 +264,7 @@ Engine_Passersby : CroneEngine {
 
 		startPauseRoutine = {
 			pauseRoutine = Routine {
-				(decay + 0.01).wait;
+				(maxDecay + 0.01).wait;
 				if(synthVoice.notNil, {
 					synthVoice.run(false);
 				});

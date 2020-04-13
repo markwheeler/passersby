@@ -1,0 +1,18 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Norns: Run",
+            "type": "shell",
+            "command": "sshpass -p sleep rsync -a --delete --exclude=\".*\" ${workspaceFolder} we@norns.local:/home/we/dust/code/ && echo \"norns.script.load(\\\"code/${workspaceFolderBasename}/${workspaceFolderBasename}.lua\\\")\" | websocat --one-message --protocol bus.sp.nanomsg.org ws://192.168.0.20:5555",
+            "problemMatcher": [],
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        }
+    ]
+}
