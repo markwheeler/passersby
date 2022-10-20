@@ -1,5 +1,5 @@
 -- Passersby
--- 1.2.0 @markeats
+-- 1.2.1 @markeats
 -- llllllll.co/t/passersby
 --
 -- MIDI or grid controlled West Coast
