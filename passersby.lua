@@ -1,5 +1,5 @@
 -- Passersby
--- 1.2.1 @markeats
+-- 1.2.0 @markeats
 -- llllllll.co/t/passersby
 --
 -- MIDI or grid controlled West Coast
@@ -553,7 +553,7 @@ end
 
 -- Grid input
 local function grid_key(x, y, z)
-  local note_num = util.clamp(((grid_device.device.rows - 1 - y) * 5) + x + 33, 0, 127)
+  local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127)
   
   if z == 1 then
     note_on(note_num, 0.8)
